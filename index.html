@@ -17,12 +17,12 @@
 <style>
 :root{
   --bg:#f3f5f1; --panel:#fff; --fg:#1d2a22; --muted:#5d6b62; --line:#d9e0d8; --sel:#e9f3ec; --accent:#2f7d4f; --danger:#b3261e; --sel-ring:#e8590c;
-  --cand:#e0a800; --build:#d9480f; --wcol:#2b8a3e; --wproc:#1971c2; --wtrade:#7048e8; --zhkh:#0c8599; --spec:#c2255c; --other:#868e96; --refused:#ff0000; --me:#1a73e8;
+  --cand:#e0a800; --build:#d9480f; --wcol:#2b8a3e; --wproc:#1971c2; --wtrade:#7048e8; --zhkh:#0c8599; --spec:#c2255c; --plant:#212529; --other:#868e96; --refused:#ff0000; --me:#1a73e8;
   --f-display:"Fraunces",Georgia,serif; --f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
 }
 @media (prefers-color-scheme: dark){:root{
   --bg:#121814; --panel:#18211b; --fg:#e3eae4; --muted:#9aa89e; --line:#2a362d; --sel:#1f3326; --accent:#5cc185; --danger:#ff8a80; --sel-ring:#ffa94d;
-  --cand:#ffd24d; --build:#ff8a4c; --wcol:#5cc185; --wproc:#5ca8f0; --wtrade:#a891f0; --zhkh:#3bc9db; --spec:#f06595; --other:#adb5bd; --refused:#ff2a2a; --me:#4c9aff; color-scheme:dark}}
+  --cand:#ffd24d; --build:#ff8a4c; --wcol:#5cc185; --wproc:#5ca8f0; --wtrade:#a891f0; --zhkh:#3bc9db; --spec:#f06595; --plant:#f8f9fa; --other:#adb5bd; --refused:#ff2a2a; --me:#4c9aff; color-scheme:dark}}
 [hidden]{display:none!important}
 html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--fg);font:14px/1.4 var(--f-body)}
@@ -231,7 +231,7 @@ a.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
 <script>
-const TYPES={build:['Строительство зданий','--build',5.5],waste_collect:['Сбор неопасных отходов','--wcol',6],waste_process:['Обработка и захоронение отходов','--wproc',6.5],waste_trade:['Оптовая торговля отходами и ломом','--wtrade',6],zhkh:['ЖКХ','--zhkh',7],specavto:['Спецавтобаза','--spec',7],other:['Другое','--other',5.5]};
+const TYPES={build:['Строительство зданий','--build',5.5],waste_collect:['Сбор неопасных отходов','--wcol',6],waste_process:['Обработка и захоронение отходов','--wproc',6.5],waste_trade:['Оптовая торговля отходами и ломом','--wtrade',6],zhkh:['ЖКХ','--zhkh',7],specavto:['Спецавтобаза','--spec',7],waste_plant:['Мусороперерабатывающий завод','--plant',8.5],other:['Другое','--other',5.5]};
 const STATUSES={new:'Новый',to_check:'Проверить',contacted:'Связались',negotiation:'Переговоры',client:'Клиент',refused:'Отказ',closed:'Не работает'};
 const RESULTS={interest:'Интерес, ждут предложение',order:'Договорились о заказе',think:'Думают',no_need:'Пока не нужно',refused:'Отказ',not_found:'Не застал, закрыто'};
 // какой статус получает точка после визита (null: не меняем)
