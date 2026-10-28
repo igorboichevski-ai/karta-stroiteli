@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Карта строителей</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/favicon.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#2f7d4f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Карта">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#f3f5f1; --panel:#fff; --fg:#1d2a22; --muted:#5d6b62; --line:#d9e0d8; --sel:#e9f3ec; --accent:#2f7d4f; --danger:#b3261e; --sel-ring:#e8590c;
+  --cand:#e0a800; --build:#d9480f; --wcol:#2b8a3e; --wproc:#1971c2; --wtrade:#7048e8; --other:#868e96; --refused:#ff0000; --me:#1a73e8;
+  --f-display:"Fraunces",Georgia,serif; --f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#121814; --panel:#18211b; --fg:#e3eae4; --muted:#9aa89e; --line:#2a362d; --sel:#1f3326; --accent:#5cc185; --danger:#ff8a80; --sel-ring:#ffa94d;
+  --cand:#ffd24d; --build:#ff8a4c; --wcol:#5cc185; --wproc:#5ca8f0; --wtrade:#a891f0; --other:#adb5bd; --refused:#ff2a2a; --me:#4c9aff; color-scheme:dark}}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font:14px/1.4 var(--f-body)}
+button,input,select,textarea{font:inherit;color:inherit}
+input,select,textarea{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 9px;width:100%;box-sizing:border-box}
+textarea{resize:vertical;min-height:60px}
+button{cursor:pointer;border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:7px 12px}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500}
+button.danger{color:var(--danger)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+h1,h2{font-family:var(--f-display);font-weight:600;margin:0}
+.k{color:var(--muted);font-size:12px}
+/* login */
+#login{min-height:100%;display:grid;place-items:center;padding:16px;box-sizing:border-box}
+#login form{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;width:min(360px,100%);display:grid;gap:12px;box-sizing:border-box}
+.err{color:var(--danger);font-size:13px}
+/* app */
+#app{height:100%;display:grid;grid-template-columns:350px 1fr}
+aside{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;min-width:0}
+.head{padding:14px 16px;display:grid;gap:8px;border-bottom:1px solid var(--line)}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.row{display:flex;gap:6px}
+#list{list-style:none;margin:0;padding:0;overflow:auto;flex:1}
+#list li{padding:8px 16px;border-bottom:1px solid var(--line);cursor:pointer;display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;align-items:baseline}
+#list li:hover,#list li.on{background:var(--sel)}
+#list .r{grid-column:2/4;color:var(--muted);font-size:12px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%}
+.pill{font-size:11px;padding:1px 7px;border-radius:99px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.pill.client{border-color:var(--accent);color:var(--accent)}
+.pill.refused{border-color:var(--refused);color:var(--refused);font-weight:600}
+.refnote{border:1px solid var(--danger);color:var(--danger);border-radius:6px;padding:6px 8px;font-size:13px}
+#list li.hid{opacity:.6}
+.chk{display:flex;align-items:center;gap:6px;cursor:pointer}
+.chk input{width:auto;margin:0}
+.hidnote{background:var(--sel);border-radius:6px;padding:6px 8px;font-size:13px}
+.mapwrap{position:relative;min-width:0}
+#map{position:absolute;inset:0}
+#panel{position:absolute;top:12px;right:12px;bottom:12px;z-index:1000;width:min(380px,calc(100% - 24px));background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 28px rgb(0 0 0/.15);display:flex;flex-direction:column;min-height:0}
+#panel .ph{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:8px;align-items:start}
+#panel .pb{padding:12px 16px;overflow:auto;display:grid;gap:10px;align-content:start}
+#panel label{display:grid;gap:3px;font-size:12px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.locbtn{width:34px;height:34px;padding:0;display:grid;place-items:center;font-size:18px;line-height:1;background:var(--panel);color:var(--fg);border:0;border-radius:4px}
+.locbtn.on{color:var(--me)}
+.rlabel{background:none;border:0;box-shadow:none;padding:0;font-size:11px;font-weight:500;color:#3b4a40;text-shadow:0 0 3px #fff,0 0 3px #fff}
+.rlabel.obl{font-size:14px;font-weight:600;color:#1d2a22}
+.rlabel::before{display:none}
+/* флажки визитов и меню статусов с флажками */
+.flagicon{background:none;border:0}
+.flagicon svg{display:block;filter:drop-shadow(0 1px 1.5px rgb(0 0 0/.45))}
+.flagicon.hid{opacity:.6}
+.fsel{position:relative;flex:1 1 0;min-width:0}
+.row>select{flex:1 1 0;min-width:0}
+.fsel-btn{width:100%;display:flex;align-items:center;gap:7px;background:var(--bg);text-align:left;padding:7px 9px;min-height:34px}
+.fsel-btn span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fsel-btn i{font-style:normal;color:var(--muted);font-size:11px}
+.fsel-list{position:absolute;left:0;top:100%;z-index:2100;min-width:100%;box-sizing:border-box;margin:2px 0 0;padding:4px 0;list-style:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgb(0 0 0/.18);max-height:320px;overflow:auto}
+.fsel-list li{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;white-space:nowrap;color:var(--fg)}
+.fsel-list li:hover,.fsel-list li.on{background:var(--sel)}
+.fsel-btn .fsel-nf,.fsel-nf{display:inline-block;width:14px;flex:none}
+.yearbox select{font:inherit;font-size:13px;padding:5px 6px;border:0;border-radius:4px;background:var(--panel);color:var(--fg)}
+.locbtn.wait{animation:locblink 1s infinite}
+@keyframes locblink{50%{opacity:.4}}
+.comment{border-left:3px solid var(--line);padding:2px 0 2px 8px}
+#addHint{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:1000;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px}
+.leaflet-container{background:var(--bg);font-family:var(--f-body)}
+.coords{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+a.btn{display:inline-block;text-decoration:none;color:inherit;border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:7px 12px}
+a.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.visit{border:1px solid var(--accent);border-radius:8px;padding:10px;display:grid;gap:8px}
+.vitem{border-left:3px solid var(--accent);padding:2px 0 2px 8px}
+.vitem.queued{border-left-color:var(--cand)}
+.vitem .del{float:right;padding:2px 8px;font-size:12px}
+#report{position:fixed;inset:0;z-index:2000;background:rgb(0 0 0/.4);display:grid;place-items:center;padding:16px;box-sizing:border-box}
+.rbox{background:var(--panel);border:1px solid var(--line);border-radius:12px;width:min(1200px,100%);height:100%;max-height:900px;display:flex;flex-direction:column;min-height:0}
+.rbox .ph{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:8px;align-items:center}
+.rctl{display:flex;flex-wrap:wrap;gap:8px;align-items:end;padding:12px 16px}
+.rctl label{display:grid;gap:3px;font-size:12px;color:var(--muted)}
+.rctl input,.rctl select{width:auto}
+#rSum{padding:0 16px 8px}
+.rtable{overflow:auto;padding:0 16px 16px;flex:1;min-height:0}
+.rtable table{border-collapse:collapse;font-size:13px;min-width:100%}
+.rtable th,.rtable td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+.rtable th{position:sticky;top:0;background:var(--panel);font-weight:600;white-space:nowrap}
+.rtable td.c{cursor:pointer;color:var(--accent)}
+@media (max-width:760px){#report{padding:0}.rbox{border-radius:0;max-height:none}}
+#mnav{display:none}
+#offNote{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:900;background:var(--cand);color:#1d2a22;border-radius:99px;padding:5px 12px;font-size:13px;font-weight:500;white-space:nowrap;box-shadow:0 2px 8px rgb(0 0 0/.2)}
+/* телефон: карта на весь экран, список отдельной вкладкой, внизу переключатель */
+@media (max-width:760px){
+  input,select,textarea,.fsel-btn{font-size:16px}
+  #app{display:block;position:relative;height:100%}
+  .mapwrap,aside{position:absolute;left:0;right:0;top:0;bottom:calc(56px + env(safe-area-inset-bottom))}
+  aside{z-index:1500;border-right:0;overflow:auto;display:none}
+  #app.m-list aside{display:flex}
+  #list{overflow:visible;flex:none}
+  #list li{padding:11px 16px}
+  #addBtn{display:none}
+  #mnav{display:flex;position:absolute;left:0;right:0;bottom:0;height:56px;padding-bottom:env(safe-area-inset-bottom);background:var(--panel);border-top:1px solid var(--line);z-index:1600}
+  #mnav button{flex:1;border:0;border-radius:0;background:none;font-weight:500;color:var(--muted)}
+  #mnav button.on{color:var(--accent);box-shadow:inset 0 3px var(--accent)}
+  #mnav #mAdd{color:var(--accent)}
+  #panel{top:auto;left:0;right:0;bottom:0;width:auto;height:65%;border-radius:14px 14px 0 0;border-bottom:0}
+  #addHint{top:auto;bottom:12px;width:max-content;max-width:calc(100% - 24px);box-shadow:0 4px 16px rgb(0 0 0/.2)}
+}
+</style>
+</head>
+<body>
+<div id="login" hidden>
+  <form id="loginForm">
+    <h1>Карта строителей</h1>
+    <p class="k">Войдите под учётной записью, которую вам выдал администратор.</p>
+    <input id="email" type="email" placeholder="Электронная почта" autocomplete="username" required>
+    <input id="password" type="password" placeholder="Пароль" autocomplete="current-password" required>
+    <button class="primary" type="submit">Войти</button>
+    <div class="err" id="loginErr"></div>
+  </form>
+</div>
+
+<div id="app" hidden>
+  <aside>
+    <div class="head">
+      <div class="top"><h1 style="font-size:20px">Карта</h1><span class="k" id="me"></span></div>
+      <input id="q" type="search" placeholder="Поиск: название, город, телефон или координаты">
+      <div class="row"><select id="fType"></select><select id="fRegion"><option value="">Все области</option></select></div>
+      <div class="row"><select id="fStatus"></select><select id="fOwner"><option value="">Все ответственные</option><option value="me">Мои</option><option value="none">Без ответственного</option></select></div>
+      <div class="row" style="flex-wrap:wrap"><button class="primary" id="addBtn" type="button">+ Добавить точку</button><button id="reportBtn" type="button">Отчёт</button><button id="reload" type="button">Обновить</button><button id="logout" type="button">Выйти</button><button id="installBtn" type="button" hidden>Установить на телефон</button></div>
+      <div class="k" id="vQueue" hidden></div>
+      <label class="chk k"><input type="checkbox" id="fHidden"> Показать только скрытые точки</label>
+      <div class="k" id="cnt"></div>
+    </div>
+    <ul id="list"></ul>
+  </aside>
+  <div class="mapwrap">
+    <div id="map"></div>
+    <div id="offNote" hidden></div>
+    <div id="addHint" hidden>Нажмите на карту, где находится объект. <button id="addCancel" type="button">Отмена</button></div>
+    <div id="panel" hidden>
+      <div class="ph"><div><span class="pill" id="pType"></span><h2 id="pTitle" style="font-size:18px;margin-top:4px"></h2></div><button id="pClose" type="button" aria-label="Закрыть">✕</button></div>
+      <form class="pb" id="pForm">
+        <div class="coords"><span class="k">Координаты</span> <b id="pCoords"></b> <button type="button" id="pCopy">Копировать</button></div>
+        <div class="row"><a class="btn primary" id="pNavi" href="#">Маршрут в Яндекс Навигаторе</a><a class="btn" id="pYmaps" href="#" target="_blank" rel="noopener">Яндекс Карты</a></div>
+        <label>Название<input id="e_name" required></label>
+        <div class="grid2">
+          <label>Тип<select id="e_type"></select></label>
+          <label>Статус<select id="e_status"></select></label>
+        </div>
+        <label id="reasonBox" hidden>Причина отказа (увидят все)<input id="e_reason" placeholder="Например: работают только с постоянным поставщиком"></label>
+        <label>Ответственный<select id="e_owner"><option value="">—</option></select></label>
+        <label>Адрес<input id="e_address"></label>
+        <div class="grid2">
+          <label>Телефон<input id="e_phone"></label>
+          <label>Email<input id="e_email"></label>
+        </div>
+        <div class="grid2">
+          <label>Сайт<input id="e_website"></label>
+          <label>УНП<input id="e_unp"></label>
+        </div>
+        <label>Область<select id="e_region"></select></label>
+        <label>Описание<textarea id="e_notes"></textarea></label>
+        <div class="refnote" id="pRefNote" hidden></div>
+        <div class="hidnote" id="pHidNote" hidden></div>
+        <div class="k" id="pMeta"></div>
+        <div class="row" style="flex-wrap:wrap"><button class="primary" type="submit">Сохранить</button><button type="button" id="pMove">Переместить точку</button><button type="button" id="pHide">Скрыть с карты</button><button type="button" class="danger" id="pDelete" hidden>Удалить</button></div>
+        <div class="err" id="pErr"></div>
+        <button type="button" class="primary" id="pVisit">Отметить визит</button>
+        <div class="visit" id="visitForm" hidden>
+          <h2 style="font-size:15px">Визит</h2>
+          <div class="grid2"><label>Когда<input type="datetime-local" id="v_at"></label><label>Результат<select id="v_result"></select></label></div>
+          <div class="grid2"><label>С кем говорили<input id="v_contact" placeholder="ФИО, должность"></label><label>Телефон контакта<input id="v_phone" type="tel"></label></div>
+          <div class="grid2"><label>Что покупают, что интересует<input id="v_products"></label><label>Объём<input id="v_volume" placeholder="например, 20 м³ в месяц"></label></div>
+          <div class="grid2"><label>Следующий шаг<input id="v_next" placeholder="например, отправить КП"></label><label>Когда<input type="date" id="v_next_date"></label></div>
+          <label>Заметки<textarea id="v_notes" placeholder="Всё, что важно для CRM"></textarea></label>
+          <div class="row"><button type="button" class="primary" id="v_save">Сохранить визит</button><button type="button" id="v_cancel">Отмена</button></div>
+          <div class="err" id="v_err"></div>
+        </div>
+        <h2 style="font-size:15px;margin-top:6px">Визиты</h2>
+        <div id="visits" style="display:grid;gap:8px"></div>
+        <h2 style="font-size:15px;margin-top:6px">Комментарии</h2>
+        <div id="comments" style="display:grid;gap:8px"></div>
+        <textarea id="newComment" placeholder="Например: позвонили, перезвонить в понедельник"></textarea>
+        <button type="button" id="addComment">Добавить комментарий</button>
+      </form>
+    </div>
+  </div>
+  <nav id="mnav"><button type="button" data-v="map" class="on">Карта</button><button type="button" data-v="list">Список</button><button type="button" id="mAdd">+ Точка</button></nav>
+</div>
+
+<div id="report" hidden>
+  <div class="rbox">
+    <div class="ph"><h2 style="font-size:18px">Отчёт по визитам</h2><button id="rClose" type="button" aria-label="Закрыть">✕</button></div>
+    <div class="rctl">
+      <label>Менеджер<select id="rUser"></select></label>
+      <label>С<input type="date" id="rFrom"></label>
+      <label>По<input type="date" id="rTo"></label>
+      <button class="primary" id="rShow" type="button">Показать</button>
+      <button id="rXlsx" type="button">Скачать Excel</button>
+      <button id="rBitrix" type="button">Для Битрикс24 (CSV)</button>
+    </div>
+    <div class="k" id="rSum"></div>
+    <div class="rtable"><table id="rTable"></table></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script>
+const TYPES={build:['Строительство зданий','--build',5.5],waste_collect:['Сбор неопасных отходов','--wcol',6],waste_process:['Обработка и захоронение отходов','--wproc',6.5],waste_trade:['Оптовая торговля отходами и ломом','--wtrade',6],other:['Другое','--other',5.5]};
+const STATUSES={new:'Новый',to_check:'Проверить',contacted:'Связались',negotiation:'Переговоры',client:'Клиент',refused:'Отказ',closed:'Не работает'};
+const RESULTS={interest:'Интерес, ждут предложение',order:'Договорились о заказе',think:'Думают',no_need:'Пока не нужно',refused:'Отказ',not_found:'Не застал, закрыто'};
+// какой статус получает точка после визита (null: не меняем)
+const RES_STATUS={interest:'negotiation',order:'client',think:'negotiation',no_need:'contacted',refused:'refused',not_found:null};
+const REGIONS=['Брестская область','Витебская область','Гомельская область','Гродненская область','Минская область','Могилевская область','г. Минск'];
+const $=id=>document.getElementById(id);
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+if(!KARTA_CONFIG.supabaseUrl){document.body.innerHTML='<p style="padding:24px">Карта ещё не подключена к базе: впишите адрес Supabase и ключ anon в config.js.</p>';throw new Error('config.js: нет supabaseUrl');}
+const sb=supabase.createClient(KARTA_CONFIG.supabaseUrl,KARTA_CONFIG.supabaseAnonKey);
+let me=null,profiles=[],places=[],markers=new Map(),cur=null,mode=null,map=null;
+
+function opts(sel,obj,first){sel.innerHTML=first?`<option value="">${first}</option>`:'';for(const[k,v]of Object.entries(obj))sel.add(new Option(Array.isArray(v)?v[0]:v,k));}
+opts($('v_result'),RESULTS);opts($('fType'),TYPES,'Все типы');opts($('fStatus'),STATUSES,'Все статусы');opts($('e_type'),TYPES);opts($('e_status'),STATUSES);
+REGIONS.forEach(r=>{$('fRegion').add(new Option(r,r));});$('e_region').add(new Option('—',''));REGIONS.forEach(r=>$('e_region').add(new Option(r,r)));
+
+// ---- флажки: точка, где был визит, рисуется флажком цвета своего статуса; отказ — чёрный ----
+const FLAG={new:'#ffffff',to_check:'#fab005',contacted:'#1c7ed6',negotiation:'#f76707',client:'#2b8a3e',refused:'#000000',closed:'#868e96'};
+const flagSvg=(c,h=26)=>`<svg width="${Math.round(h*.77)}" height="${h}" viewBox="0 0 20 26" aria-hidden="true"><path d="M3.5 25V2" stroke="#fff" stroke-width="4" stroke-linecap="round"/><path d="M3.5 25V2" stroke="#222" stroke-width="2" stroke-linecap="round"/><path d="M4.5 2.5h13l-3.4 4.6 3.4 4.6h-13z" fill="${c}" stroke="${c==='#ffffff'?'#495057':'#fff'}" stroke-width="1.3" stroke-linejoin="round"/></svg>`;
+let visited=new Set(),vqIds=new Set();
+const isVisited=p=>visited.has(p.id)||vqIds.has(p.id);
+// размер флажка растёт с масштабом, чтобы на общем виде он был не больше соседних кружков
+const flagH=()=>{const z=map?map.getZoom():12;return z<=7?16:z<=8?18:z<=10?22:z<=12?26:30;};
+function flagIcon(p,on){const h=flagH()+(on?10:0),w=Math.round(h*.77);
+  return L.divIcon({className:'flagicon'+(p.hidden&&!on?' hid':''),html:flagSvg(FLAG[p.status]||'#adb5bd',h),iconSize:[w,h],iconAnchor:[Math.round(h*.135),h-1],tooltipAnchor:[w/2,-h/2]});}
+// меню статусов с флажками: настоящий <select> остаётся (значение и события), поверх него кнопка и список
+function flagSelect(sel){
+  const w=document.createElement('div');w.className='fsel';sel.after(w);sel.hidden=true;
+  const b=document.createElement('button');b.type='button';b.className='fsel-btn';const ul=document.createElement('ul');ul.className='fsel-list';ul.hidden=true;w.append(b,ul);
+  const ico=v=>FLAG[v]?flagSvg(FLAG[v],18):'<span class="fsel-nf"></span>';
+  const draw=()=>{const o=sel.selectedOptions[0];b.innerHTML=ico(o?.value)+'<span></span><i>▾</i>';b.children[1].textContent=o?.text||'';
+    [...ul.children].forEach(li=>li.classList.toggle('on',li.dataset.v===sel.value));};
+  [...sel.options].forEach(o=>{const li=document.createElement('li');li.dataset.v=o.value;li.innerHTML=ico(o.value)+'<span></span>';li.children[1].textContent=o.text;
+    li.onclick=e=>{e.preventDefault();e.stopPropagation();sel.value=o.value;ul.hidden=true;sel.dispatchEvent(new Event('input',{bubbles:true}));sel.dispatchEvent(new Event('change',{bubbles:true}));};ul.appendChild(li);});
+  b.onclick=e=>{e.preventDefault();document.querySelectorAll('.fsel-list').forEach(x=>{if(x!==ul)x.hidden=true;});ul.hidden=!ul.hidden;};
+  document.addEventListener('click',e=>{if(!w.contains(e.target))ul.hidden=true;});
+  const d=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value');
+  Object.defineProperty(sel,'value',{get(){return d.get.call(this);},set(v){d.set.call(this,v);draw();},configurable:true});
+  draw();}
+flagSelect($('fStatus'));flagSelect($('e_status'));
+
+async function boot(){
+  // без сети с устаревшим входом Supabase долго пытается его обновить, поэтому ждём недолго, если есть сохранённые точки
+  const snap=await kv('get',SNAP);
+  const r=await (snap?tmo(sb.auth.getSession(),navigator.onLine?6000:800):sb.auth.getSession());
+  const session=r==='timeout'?null:r.data.session,error=r==='timeout'||r.error;
+  if(!session&&!(snap&&(!navigator.onLine||error))){$('login').hidden=false;$('app').hidden=true;return;}
+  $('login').hidden=true;$('app').hidden=false;
+  me=session?session.user:{id:snap.uid,email:snap.email};
+  if(!map){initMap();addMapbox();}
+  await loadAll();
+  flushAll();
+}
+$('loginForm').onsubmit=async e=>{e.preventDefault();$('loginErr').textContent='';
+  const {error}=await sb.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});
+  if(error){$('loginErr').textContent='Не получилось войти: проверьте почту и пароль.';return;} boot();};
+$('logout').onclick=async()=>{await kv('del',SNAP);await sb.auth.signOut();location.reload();};
+
+function initMap(){
+  map=L.map('map',{preferCanvas:true,zoomSnap:.5}).setView([53.7,27.9],7);
+  const osm=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© участники OpenStreetMap'});
+  const sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Снимки © Esri, Maxar, Earthstar Geographics'});
+  const labels=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxZoom:19});
+  const roads=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',{maxZoom:19});
+  // архив снимков Esri (Wayback): последний выпуск каждого года
+  const WB=[['2026','63116'],['2025','13192'],['2024','16453'],['2023','56102'],['2022','45134'],['2021','26120'],['2020','29260'],['2019','4756'],['2018','23448'],['2017','25521'],['2016','18966'],['2015','28163'],['2014','5844']];
+  const wbUrl=r=>`https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/${r}/{z}/{y}/{x}`;
+  const arch=L.tileLayer(wbUrl(WB[0][1]),{maxZoom:19,attribution:'Архив снимков © Esri World Imagery Wayback'});
+  osm.addTo(map);
+  const bases={'Схема':osm,'Спутник':sat,'Гибрид: спутник + дороги':L.layerGroup([sat,roads,labels]),'Спутник: архив по годам':arch};
+  layersCtl=L.control.layers(bases).addTo(map);
+  const Y=L.Control.extend({options:{position:'topright'},onAdd(){
+    const d=L.DomUtil.create('div','leaflet-bar yearbox');d.hidden=true;
+    const sel=L.DomUtil.create('select','',d);sel.id='wbYear';sel.title='Год снимка';
+    WB.forEach(([y,r],i)=>sel.add(new Option('Снимок '+y,r,false,i===0)));
+    sel.onchange=()=>arch.setUrl(wbUrl(sel.value));
+    L.DomEvent.disableClickPropagation(d);return d;}});
+  const yc=new Y().addTo(map);
+  map.on('baselayerchange',e=>{yc.getContainer().hidden=e.layer!==arch;});
+  addLocate();
+  addRegions();
+  map.on('zoomend',()=>markers.forEach((m,id)=>{if(m.setStyle)return;const p=places.find(x=>x.id===id);if(p)m.setIcon(flagIcon(p,id===cur));}));
+  map.on('click',e=>{if(mode==='add')createAt(e.latlng);else if(mode==='move')moveTo(e.latlng);});
+}
+// ---- области и районы (regions.geojson из OpenStreetMap): заливка областей, границы областей и районов, подписи ----
+const OBL_COLORS={'Брестская область':'#f76707','Витебская область':'#1971c2','Гомельская область':'#2b8a3e','Гродненская область':'#9c36b5','Минская область':'#fab005','Могилёвская область':'#c2255c','Минск':'#495057'};
+const RG_OFF='ks_regions_off';
+async function addRegions(){
+  let gj;try{gj=await (await fetch('regions.geojson')).json();}catch{return;}
+  map.createPane('regions').style.zIndex=350;map.getPane('regions').style.pointerEvents='none';
+  const lvl=n=>f=>f.properties.level===n,o={pane:'regions',interactive:false};
+  const fill=L.geoJSON(gj,{...o,filter:lvl(4),style:f=>({stroke:false,fillColor:OBL_COLORS[f.properties.name]||'#868e96',fillOpacity:.16})});
+  const oblB=L.layerGroup([L.geoJSON(gj,{...o,filter:lvl(4),style:{color:'#fff',weight:5,opacity:.7,fill:false}}),
+    L.geoJSON(gj,{...o,filter:lvl(4),attribution:'Границы © участники OpenStreetMap',style:{color:'#343a40',weight:2,opacity:.9,fill:false}})]);
+  const raiB=L.layerGroup([L.geoJSON(gj,{...o,filter:lvl(6),style:{color:'#fff',weight:3,opacity:.45,fill:false}}),
+    L.geoJSON(gj,{...o,filter:lvl(6),style:{color:'#343a40',weight:1.3,opacity:.8,dashArray:'5 4',fill:false}})]);
+  // подписи: области на мелком масштабе, районы при приближении
+  const lab=(f,cls)=>L.tooltip({permanent:true,direction:'center',className:'rlabel '+cls,interactive:false}).setLatLng(f.properties.lp).setContent(f.properties.name.replace(' область','').replace(' район',''));
+  const oblL=L.layerGroup(gj.features.filter(lvl(4)).map(f=>lab(f,'obl'))),raiL=L.layerGroup(gj.features.filter(lvl(6)).map(f=>lab(f,'rai')));
+  const layers={'Области цветом':fill,'Границы областей':oblB,'Границы районов':raiB};
+  let off=[];try{off=JSON.parse(localStorage.getItem(RG_OFF)||'[]');}catch{}
+  for(const[k,l]of Object.entries(layers)){if(!off.includes(k))l.addTo(map);layersCtl.addOverlay(l,k);}
+  const save=()=>{try{localStorage.setItem(RG_OFF,JSON.stringify(Object.keys(layers).filter(k=>!map.hasLayer(layers[k]))));}catch{}};
+  const labels=()=>{const z=map.getZoom();(z<=8&&(map.hasLayer(fill)||map.hasLayer(oblB))?oblL.addTo(map):oblL.remove());(z>=10&&map.hasLayer(raiB)?raiL.addTo(map):raiL.remove());};
+  // на спутнике заливка бледнее, чтобы не закрывать снимок
+  map.on('baselayerchange',e=>fill.setStyle({fillOpacity:e.name==='Схема'?.16:.07}));
+  map.on('overlayadd overlayremove',()=>{save();labels();});map.on('zoomend',labels);labels();
+}
+// Спутник Mapbox: ключ берём из config.js или из базы (таблица app_settings, видна только вошедшим)
+let layersCtl=null;
+async function addMapbox(){
+  let t=KARTA_CONFIG.mapboxToken;
+  if(!t){const{data}=await sb.from('app_settings').select('value').eq('key','mapbox_token').maybeSingle();t=data?.value;}
+  if(!t)return;
+  const mb=style=>L.tileLayer(`https://api.mapbox.com/styles/v1/mapbox/${style}/tiles/512/{z}/{x}/{y}?access_token=${t}`,{tileSize:512,zoomOffset:-1,maxZoom:19,attribution:'© Mapbox © OpenStreetMap © Maxar'});
+  layersCtl.addBaseLayer(mb('satellite-v9'),'Спутник Mapbox');
+  layersCtl.addBaseLayer(mb('satellite-streets-v12'),'Гибрид Mapbox');
+}
+// «Где я»: кнопка под зумом, точка обновляется при движении, как в навигаторе
+let geoWatch=null,geoDot=null,geoAcc=null,geoFollow=false;
+function addLocate(){
+  const C=L.Control.extend({options:{position:'topleft'},onAdd(){
+    const d=L.DomUtil.create('div','leaflet-bar');
+    const b=L.DomUtil.create('button','locbtn',d);b.id='locBtn';b.type='button';b.title='Показать, где я';b.setAttribute('aria-label','Показать, где я');b.textContent='◎';
+    L.DomEvent.disableClickPropagation(d);b.onclick=toggleLocate;return d;}});
+  new C().addTo(map);
+  map.on('dragstart',()=>{geoFollow=false;});
+}
+function toggleLocate(){
+  const b=$('locBtn');
+  if(geoWatch!==null){
+    if(geoDot&&!geoFollow){geoFollow=true;map.setView(geoDot.getLatLng(),Math.max(map.getZoom(),15));return;}
+    navigator.geolocation.clearWatch(geoWatch);geoWatch=null;geoFollow=false;
+    geoDot?.remove();geoAcc?.remove();geoDot=geoAcc=null;b.classList.remove('on','wait');b.title='Показать, где я';return;}
+  if(!navigator.geolocation){alert('Этот браузер не умеет определять местоположение.');return;}
+  b.classList.add('wait');geoFollow=true;
+  geoWatch=navigator.geolocation.watchPosition(pos=>{
+    const ll=[pos.coords.latitude,pos.coords.longitude],acc=pos.coords.accuracy;
+    if(!geoDot){
+      geoAcc=L.circle(ll,{radius:acc,weight:1,color:css('--me'),fillColor:css('--me'),fillOpacity:.12,interactive:false}).addTo(map);
+      geoDot=L.circleMarker(ll,{radius:8,weight:3,color:'#fff',fillColor:css('--me'),fillOpacity:1,interactive:false}).addTo(map);
+      map.setView(ll,Math.max(map.getZoom(),15));
+    }else{geoDot.setLatLng(ll);geoAcc.setLatLng(ll).setRadius(acc);if(geoFollow)map.panTo(ll);}
+    geoAcc.bringToFront();geoDot.bringToFront();
+    b.classList.remove('wait');b.classList.add('on');b.title='Точность около '+Math.round(acc)+' м. Нажмите, чтобы вернуться к себе; ещё раз, чтобы выключить.';
+  },err=>{
+    if(err.code!==1&&geoDot)return; // временный сбой сигнала: точка остаётся, ждём следующего обновления
+    navigator.geolocation.clearWatch(geoWatch);geoWatch=null;b.classList.remove('wait','on');
+    alert(err.code===1?'Доступ к местоположению запрещён. Разрешите его для этого сайта в настройках браузера или телефона.':'Не получилось определить местоположение. Проверьте, что геолокация на устройстве включена.');
+  },{enableHighAccuracy:true,maximumAge:5000,timeout:20000});
+}
+// ---- без интернета: последние загруженные точки хранятся в браузере (IndexedDB) и показываются, пока нет связи ----
+const SNAP='snapshot';let offline=false,snapT=null;
+function idb(){return new Promise((ok,no)=>{const r=indexedDB.open('karta-stroiteli',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error);});}
+async function kv(op,key,val){try{const db=await idb();return await new Promise((ok,no)=>{const st=db.transaction('kv',op==='get'?'readonly':'readwrite').objectStore('kv');
+  const r=op==='get'?st.get(key):op==='put'?st.put(val,key):st.delete(key);r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error);});}catch{return null;}}
+function snapSave(){clearTimeout(snapT);snapT=setTimeout(()=>{if(me&&places.length)kv('put',SNAP,{uid:me.id,email:me.email,at:Date.now(),profiles,places,visited:[...visited]});},1000);}
+const tmo=(pr,ms)=>Promise.race([pr,new Promise(r=>setTimeout(()=>r('timeout'),ms))]);
+const isNet=e=>!navigator.onLine||/fetch|network|Load failed/i.test(e?.message||String(e));
+const errText=e=>isNet(e)?'Нет интернета: не сохранилось. Повторите, когда появится связь (визиты можно отмечать, они уйдут сами).':e.message;
+async function fetchAll(table,select){let out=[],from=0;for(;;){const{data,error}=await sb.from(table).select(select).range(from,from+999);if(error)throw error;out=out.concat(data);if(data.length<1000)break;from+=1000;}return out;}
+async function loadAll(){
+  const sn0=await kv('get',SNAP),sn=sn0?.uid===me.id?sn0:null;
+  try{
+    const go=Promise.all([fetchAll('profiles','*'),fetchAll('places','*'),fetchAll('visits','place_id').catch(()=>null)]);
+    const r=await (sn?tmo(go,navigator.onLine?20000:1500):go);if(r==='timeout')throw new Error('network timeout');
+    [profiles,places]=r;if(r[2])visited=new Set(r[2].map(v=>v.place_id));
+    offline=false;$('offNote').hidden=true;snapSave();
+  }catch(err){
+    if(!sn){$('cnt').textContent=isNet(err)?'Нет интернета, а сохранённых точек в этом браузере ещё нет.':'Ошибка загрузки: '+err.message;return;}
+    profiles=sn.profiles;places=sn.places;visited=new Set(sn.visited||[]);offline=true;setTimeout(()=>{if(offline&&navigator.onLine)loadAll();},60000);
+    $('offNote').textContent='Нет интернета · точки на '+new Date(sn.at).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});$('offNote').hidden=false;}
+  const mine=profiles.find(p=>p.id===me.id);$('me').textContent=(mine?.full_name||me.email)+(mine?.role==='admin'?' · админ':'');
+  // служебные учётки (…@karta.local) в списках людей не показываем
+  const people=profiles.filter(p=>!/@karta\.local$/i.test(p.full_name||''));
+  const o=$('e_owner');o.innerHTML='<option value="">—</option>';people.forEach(p=>o.add(new Option(p.full_name||p.id,p.id)));
+  // фильтр «Ответственный»: кроме «Мои» и «Без ответственного» — каждый сотрудник
+  const fo=$('fOwner'),keep=fo.value;fo.querySelectorAll('option.person').forEach(x=>x.remove());
+  [...people].sort((a,b)=>(a.full_name||'').localeCompare(b.full_name||'','ru')).forEach(p=>{const n=places.filter(x=>x.owner===p.id).length;
+    const op=new Option(`${p.full_name||'Без имени'} (${n})`,p.id);op.className='person';fo.add(op);});
+  fo.value=[...fo.options].some(x=>x.value===keep)?keep:'';
+  applyPending();vqIds=new Set(vqGet().map(r=>r.place_id));
+  markers.forEach(m=>m.remove());markers.clear();
+  spread();places.forEach(p=>{if(p.lat!=null)markers.set(p.id,mkMarker(p));});
+  render();
+}
+function mStyle(p){const t=TYPES[p.type]||TYPES.other,on=p.id===cur;
+  if(p.status==='refused'&&!on&&!p.hidden)return{radius:t[2]+1,weight:4,color:css('--refused'),fillColor:css('--muted'),fillOpacity:.6};
+  if(p.hidden&&!on)return{radius:t[2]+1,weight:2,color:'#fff',dashArray:'3 2',fillColor:css(t[1]),fillOpacity:.85};
+  return on?{radius:t[2]+6,weight:4,color:css('--sel-ring'),fillColor:css(t[1]),fillOpacity:1}:{radius:t[2],weight:p.status==='client'?3:1.5,color:p.status==='client'?css('--fg'):css('--panel'),fillColor:css(t[1]),fillOpacity:1};}
+// точки с одинаковыми координатами раскладываем по маленькому кругу, чтобы каждую можно было выбрать
+let offs=new Map();
+function spread(){offs=new Map();const g=new Map();places.forEach(p=>{if(p.lat==null)return;const k=(+p.lat).toFixed(5)+','+(+p.lon).toFixed(5);g.has(k)?g.get(k).push(p):g.set(k,[p]);});
+  g.forEach(a=>{if(a.length<2)return;a.forEach((p,i)=>{const r=0.00025,f=2*Math.PI*i/a.length;offs.set(p.id,[r*Math.sin(f),r*Math.cos(f)/Math.cos(p.lat*Math.PI/180)]);});});}
+function pos(p){const o=offs.get(p.id)||[0,0];return[+p.lat+o[0],+p.lon+o[1]];}
+function mkMarker(p){const tip=p.status==='refused'?p.name+' · отказ':p.name;
+  if(isVisited(p))return L.marker(pos(p),{icon:flagIcon(p,p.id===cur),zIndexOffset:500,keyboard:false}).bindTooltip(tip).on('click',()=>openPlace(p.id));
+  return L.circleMarker(pos(p),mStyle(p)).bindTooltip(tip).on('click',()=>openPlace(p.id));}
+let halo=null;
+function highlight(){
+  markers.forEach((m,id)=>{const p=places.find(x=>x.id===id);if(!p)return;m.setStyle?m.setStyle(mStyle(p)):m.setIcon(flagIcon(p,id===cur));});
+  halo?.remove();halo=null;markers.forEach(x=>x.closeTooltip());const m=markers.get(cur);if(!m)return;
+  if(!map.hasLayer(m))m.addTo(map);m.bringToFront?m.bringToFront():m.setZIndexOffset(1000);
+  halo=L.circleMarker(m.getLatLng(),{radius:22,weight:3,color:css('--sel-ring'),fill:false,interactive:false}).addTo(map);
+  m.openTooltip();
+}
+// ---- поиск по координатам: «53.9, 27.56», «53,9 27,56», «53°54'12"N 27°33'36"E» ----
+const R_KM=10;
+function parseCoords(str){
+  const s=str.trim();if(!/\d/.test(s)||/[a-zа-яё]/i.test(s.replace(/[NSEWСЮВЗ]/gi,'')))return null;
+  let a=null;
+  if(s.includes('°')){const m=[...s.matchAll(/(-?\d+(?:[.,]\d+)?)\s*°\s*(?:(\d+(?:[.,]\d+)?)\s*['′]\s*)?(?:(\d+(?:[.,]\d+)?)\s*(?:["″]|'')\s*)?([NSEWСЮВЗ])?/gi)];
+    if(m.length!==2)return null;
+    a=m.map(x=>{const f=v=>v?parseFloat(v.replace(',','.')):0;let d=Math.abs(f(x[1]))+f(x[2])/60+f(x[3])/3600;if(/^-/.test(x[1])||/[SWЮЗ]/i.test(x[4]||''))d=-d;return d;});}
+  else{const t=/[\s;]/.test(s)?s.split(/[\s;]+/).map(x=>x.replace(/,$/,'')).filter(Boolean):s.split(',');
+    if(t.length!==2||!t.every(x=>/^-?\d+([.,]\d+)?$/.test(x)))return null;
+    a=t.map(x=>parseFloat(x.replace(',','.')));
+    if(!t.every(x=>/[.,]\d/.test(x)))return null;} // нужны дробные части, чтобы не путать с телефонами и УНП
+  let[lat,lon]=a;
+  if(lat>=23&&lat<=33&&lon>=51&&lon<=57)[lat,lon]=[lon,lat]; // ввели долготу первой
+  return Math.abs(lat)<=90&&Math.abs(lon)<=180?{lat,lon}:null;}
+const distKm=(c,p)=>Math.hypot((p.lat-c.lat)*110.57,(p.lon-c.lon)*111.32*Math.cos(c.lat*Math.PI/180));
+let qPin=null,qKey='';
+function coordSearch(){const c=parseCoords($('q').value),k=c?c.lat+','+c.lon:'';if(k===qKey)return;qKey=k;
+  qPin?.remove();qPin=null;if(!c||!map)return;
+  const box=document.createElement('div');box.style.cssText='display:grid;gap:6px';
+  box.innerHTML='<b></b><button type="button" class="primary">Добавить точку здесь</button>';box.children[0].textContent=c.lat.toFixed(6)+', '+c.lon.toFixed(6);
+  box.children[1].onclick=()=>{qPin?.closePopup();createAt({lat:c.lat,lng:c.lon});};
+  qPin=L.marker([c.lat,c.lon],{title:'Искомые координаты',zIndexOffset:1000}).bindPopup(box).addTo(map);
+  map.setView([c.lat,c.lon],15);}
+// qc: координаты из поиска — тогда вместо текста ищем точки в радиусе R_KM
+function visible(p,qc){
+  if(qc&&(p.lat==null||distKm(qc,p)>R_KM))return false;
+  const q=qc?'':$('q').value.trim().toLowerCase(),t=$('fType').value,r=$('fRegion').value,s=$('fStatus').value,o=$('fOwner').value;
+  return (!q||[p.name,p.address,p.phone,p.notes].join(' ').toLowerCase().includes(q))&&(!t||p.type===t)&&(!r||p.region===r)&&(!s||p.status===s)&&(!o||(o==='me'?p.owner===me.id:o==='none'?!p.owner:p.owner===o))&&(!!p.hidden===$('fHidden').checked);
+}
+function render(){
+  const list=$('list');list.innerHTML='';let n=0;const frag=document.createDocumentFragment();
+  const qc=parseCoords($('q').value),vis=[];
+  places.forEach(p=>{const m=markers.get(p.id);const ok=visible(p,qc)||p.id===cur;if(m){ok?m.addTo(map):m.remove();}if(ok)vis.push(p);});
+  if(qc){vis.sort((a,b)=>distKm(qc,a)-distKm(qc,b));
+    const li=document.createElement('li');li.innerHTML='<span>📍</span><b></b><span></span><span class="r">Показать на карте</span>';
+    li.children[1].textContent=qc.lat.toFixed(6)+', '+qc.lon.toFixed(6);li.onclick=()=>{if(mob())mView('map');qKey='';coordSearch();};frag.appendChild(li);}
+  vis.forEach(p=>{n++;if(n>500)return;
+    const li=document.createElement('li');li.dataset.id=p.id;li.className=(p.id===cur?'on ':'')+(p.hidden?'hid':'');
+    const t=TYPES[p.type]||TYPES.other;
+    li.innerHTML=`<i class="dot" style="background:var(${t[1]})"></i><span></span><span class="pill ${p.status}"></span><span class="r"></span>`;
+    li.children[1].textContent=p.name;li.children[2].textContent=STATUSES[p.status]||p.status;li.children[3].textContent=[qc&&p.lat!=null?distKm(qc,p).toFixed(1).replace('.',',')+' км':'',p.hidden?'скрыта':'',p.address,p.region,p.lat==null?'нет на карте':''].filter(Boolean).join(' · ');
+    li.onclick=()=>{if(mob())mView('map');openPlace(p.id,true);};frag.appendChild(li);});
+  list.appendChild(frag);highlight();const nh=places.filter(p=>p.hidden).length;
+  $('cnt').textContent=`Показано ${n} из ${places.length}`+(qc?` · в радиусе ${R_KM} км от координат`:'')+(nh?` · скрыто ${nh}`:'')+(n>500?' (в списке первые 500, на карте все)':'');
+}
+['q','fType','fRegion','fStatus','fOwner','fHidden'].forEach(id=>$(id).addEventListener('input',render));
+$('q').addEventListener('input',coordSearch);
+$('reload').onclick=loadAll;
+
+// телефон: внизу переключатель «Карта / Список»
+const mob=()=>innerWidth<=760;
+function mView(v){$('app').classList.toggle('m-list',v==='list');document.querySelectorAll('#mnav [data-v]').forEach(b=>b.classList.toggle('on',b.dataset.v===v));}
+document.querySelectorAll('#mnav [data-v]').forEach(b=>b.onclick=()=>mView(b.dataset.v));
+$('mAdd').onclick=()=>{mView('map');$('panel').hidden=true;cur=null;render();$('addBtn').click();};
+
+// установка как приложения: Android/Chrome дают системное окно, на iPhone показываем подсказку
+const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+const ios=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+let installEv=null;
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEv=e;$('installBtn').hidden=false;});
+addEventListener('appinstalled',()=>{$('installBtn').hidden=true;});
+if(ios&&!standalone)$('installBtn').hidden=false;
+$('installBtn').onclick=async()=>{
+  if(installEv){installEv.prompt();await installEv.userChoice;installEv=null;$('installBtn').hidden=true;return;}
+  alert('Откройте сайт в Safari, нажмите «Поделиться» (квадрат со стрелкой) и выберите «На экран Домой».');};
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+
+async function openPlace(id,fly){
+  cur=id;const p=places.find(x=>x.id===id);if(!p)return;
+  $('panel').hidden=false;$('pTitle').textContent=p.name;$('pType').textContent=(TYPES[p.type]||[p.type])[0];
+  for(const f of['name','type','status','address','phone','email','website','unp','region','notes'])$('e_'+f).value=p[f]??'';
+  $('e_owner').value=p.owner||'';$('e_reason').value='';$('reasonBox').hidden=true;
+  $('pRefNote').hidden=p.status!=='refused';$('pRefNote').textContent='Отказ: с нами не работает, время на эту точку не тратить.';
+  $('pMeta').textContent=`Источник: ${p.source||'добавлено вручную'} · изменено ${new Date(p.updated_at).toLocaleString('ru-RU')}`;
+  const mp=profiles.find(x=>x.id===me.id);$('pDelete').hidden=!(mp?.role==='admin'||mp?.can_delete_places);$('pErr').textContent='';
+  showCoords(p);showHidden(p);
+  if(fly&&p.lat!=null){map.setView(pos(p),Math.max(map.getZoom(),15),{animate:false});if(!mob())map.panBy([$('panel').offsetWidth/2,0],{animate:false});else map.panBy([0,$('panel').offsetHeight/2],{animate:false});}
+  $('visitForm').hidden=true;$('pVisit').hidden=false;
+  render();loadComments(id);loadVisits(id);
+}
+function showCoords(p){
+  const ok=p.lat!=null,c=ok?`${(+p.lat).toFixed(6)}, ${(+p.lon).toFixed(6)}`:'нет, поставьте точку кнопкой «Переместить точку»';
+  $('pCoords').textContent=c;$('pCopy').hidden=!ok;$('pNavi').hidden=!ok;$('pYmaps').hidden=!ok;if(!ok)return;
+  $('pNavi').href=`yandexnavi://build_route_on_map?lat_to=${p.lat}&lon_to=${p.lon}`;
+  $('pYmaps').href=`https://yandex.by/maps/?pt=${p.lon},${p.lat}&z=16&l=map&rtext=~${p.lat},${p.lon}&rtt=auto`;
+}
+function showHidden(p){
+  $('pHide').textContent=p.hidden?'Вернуть на карту':'Скрыть с карты';$('pHidNote').hidden=!p.hidden;
+  if(p.hidden){const a=profiles.find(x=>x.id===p.hidden_by);$('pHidNote').textContent='Точка скрыта с карты'+(a?' · '+(a.full_name||'—'):'')+(p.hidden_at?' · '+new Date(p.hidden_at).toLocaleString('ru-RU'):'');}
+}
+// скрытая точка пропадает с карты и из списка; увидеть её можно галочкой «Показать только скрытые точки»
+$('pHide').onclick=async()=>{const p=places.find(x=>x.id===cur);if(!p)return;const h=!p.hidden;
+  const{data,error}=await savePlace(cur,{hidden:h,hidden_by:h?me.id:null,hidden_at:h?new Date().toISOString():null});
+  if(error){$('pErr').textContent=/hidden/.test(error.message)?'Скрытие ещё не включено: администратору нужно один раз выполнить SQL-скрипт update_hidden.sql в Supabase.':error.message;return;}
+  Object.assign(p,data);await addCmt(p.id,h?'Скрыл(а) точку с карты.':'Вернул(а) точку на карту.');
+  if(h!==$('fHidden').checked){$('panel').hidden=true;cur=null;}
+  refreshMarker(p);if(cur)openPlace(cur);};
+$('pCopy').onclick=async()=>{try{await navigator.clipboard.writeText($('pCoords').textContent);$('pCopy').textContent='Скопировано';}catch{$('pCopy').textContent='Не скопировалось';}setTimeout(()=>$('pCopy').textContent='Копировать',1500);};
+$('pClose').onclick=()=>{$('panel').hidden=true;cur=null;render();};
+// при выборе «Отказ» просим причину, она сохраняется комментарием и видна всем в карточке
+$('e_status').addEventListener('change',()=>{const p=places.find(x=>x.id===cur);$('reasonBox').hidden=!($('e_status').value==='refused'&&p?.status!=='refused');});
+$('pForm').onsubmit=async e=>{e.preventDefault();const p=places.find(x=>x.id===cur);
+  const reason=$('e_reason').value.trim(),toRefused=$('e_status').value==='refused'&&p.status!=='refused';
+  if(toRefused&&!reason){$('pErr').textContent='Напишите причину отказа, чтобы коллеги её видели.';$('e_reason').focus();return;}
+  const patch={};for(const f of['name','type','status','address','phone','email','website','unp','region','notes'])patch[f]=$('e_'+f).value.trim()||null;
+  patch.name=patch.name||p.name;patch.type=patch.type||p.type;patch.status=patch.status||'new';patch.owner=$('e_owner').value||null;
+  for(const k in patch)if(patch[k]===(p[k]??null))delete patch[k]; // отправляем только изменённые поля
+  if(!Object.keys(patch).length){$('pErr').textContent='Изменений нет';return;}
+  const{data,error,queued}=await savePlace(cur,patch);
+  if(error){$('pErr').textContent='Не сохранилось: '+error.message;return;}
+  if(toRefused)await addCmt(p.id,'Отказ: '+reason);
+  Object.assign(p,data);refreshMarker(p);openPlace(p.id);$('pErr').textContent=queued?SAVED_LOCAL:'Сохранено';};
+function refreshMarker(p){offs.delete(p.id);markers.get(p.id)?.remove();if(p.lat!=null)markers.set(p.id,mkMarker(p));render();snapSave();}
+$('pDelete').onclick=async()=>{if($('pDelete').dataset.confirm!=='1'){$('pDelete').dataset.confirm='1';$('pDelete').textContent='Точно удалить?';return;}
+  $('pDelete').dataset.confirm='';$('pDelete').textContent='Удалить';
+  if(cur<0){oqSet(oqGet().filter(o=>o.id!==cur&&o.tmp!==cur));vqSet(vqGet().filter(r=>r.place_id!==cur));updQueue();}
+  else{const{error}=await sb.from('places').delete().eq('id',cur);if(error){$('pErr').textContent=isNet(error)?'Удалять точки можно только с интернетом.':error.message;return;}}
+  markers.get(cur)?.remove();markers.delete(cur);places=places.filter(x=>x.id!==cur);$('panel').hidden=true;cur=null;render();snapSave();};
+
+async function loadComments(id){
+  const pend=oqGet().filter(o=>o.t==='cmt'&&o.id===id).reverse().map(o=>({author:o.author,created_at:o.at,body:o.body,queued:true}));
+  const r=id<0?{data:[]}:await sb.from('place_comments').select('*').eq('place_id',id).order('created_at',{ascending:false});
+  const box=$('comments');box.innerHTML='';if(r.error&&!pend.length){box.textContent=isNet(r.error)?'Комментарии появятся, когда будет интернет.':r.error.message;return;}
+  const data=pend.concat(r.error?[]:r.data);
+  const p=places.find(x=>x.id===id),why=data.find(c=>c.body.startsWith('Отказ:'));
+  if(p?.status==='refused'&&why&&id===cur){const a=profiles.find(x=>x.id===why.author);$('pRefNote').textContent=`Отказ: ${why.body.slice(6).trim()} (${a?.full_name||'—'}, ${new Date(why.created_at).toLocaleDateString('ru-RU')}). Время на эту точку не тратить.`;}
+  if(!data.length){box.innerHTML='<span class="k">Пока нет комментариев.</span>';return;}
+  data.forEach(c=>{const d=document.createElement('div');d.className='comment';const a=profiles.find(x=>x.id===c.author);
+    d.innerHTML='<div class="k"></div><div></div>';d.children[0].textContent=(a?.full_name||'—')+' · '+new Date(c.created_at).toLocaleString('ru-RU')+(c.queued?' · ждёт отправки':'');d.children[1].textContent=c.body;box.appendChild(d);});
+}
+$('addComment').onclick=async()=>{const body=$('newComment').value.trim();if(!body||!cur)return;
+  const{error}=await addCmt(cur,body);if(error){$('pErr').textContent=error.message;return;}
+  $('newComment').value='';loadComments(cur);};
+
+$('addBtn').onclick=()=>{mode='add';$('addHint').hidden=false;$('addHint').firstChild.textContent='Нажмите на карту, где находится объект. ';};
+$('pMove').onclick=()=>{if(!cur)return;mode='move';$('addHint').hidden=false;$('addHint').firstChild.textContent='Нажмите на карту в новом месте точки. ';};
+$('addCancel').onclick=()=>{mode=null;$('addHint').hidden=true;};
+async function createAt(ll){mode=null;$('addHint').hidden=true;
+  const row={name:'Новая точка',type:'other',status:'to_check',lat:ll.lat,lon:ll.lng,source:'добавлено вручную',created_by:me.id,owner:me.id};
+  let{data,error}=navigator.onLine?await sb.from('places').insert(row).select().single():{error:{message:'offline'}};
+  if(error&&isNet(error)){const now=new Date().toISOString();data={...row,id:-Date.now(),hidden:false,created_at:now,updated_at:now};error=null;
+    oqPush({t:'ins',tmp:data.id,row,place:data});}
+  if(error){alert(error.message);return;}places.unshift(data);markers.set(data.id,mkMarker(data));openPlace(data.id);snapSave();$('e_name').select();}
+async function moveTo(ll){mode=null;$('addHint').hidden=true;const p=places.find(x=>x.id===cur);
+  const{data,error,queued}=await savePlace(cur,{lat:ll.lat,lon:ll.lng});
+  if(error){$('pErr').textContent=error.message;return;}Object.assign(p,data);refreshMarker(p);showCoords(p);if(queued)$('pErr').textContent=SAVED_LOCAL;}
+
+// ---- визиты: менеджер на месте заполняет короткую форму; без интернета визит ждёт в телефоне и уходит позже ----
+const VQ='ks_visit_queue';
+function vqGet(){try{return JSON.parse(localStorage.getItem(VQ)||'[]');}catch{return[];}}
+function vqSet(a){try{localStorage.setItem(VQ,JSON.stringify(a));}catch{}}
+function localInput(d){return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);}
+function dstr(d){return localInput(d).slice(0,10);}
+let vPos=null;
+$('pVisit').onclick=()=>{const p=places.find(x=>x.id===cur);if(!p)return;
+  for(const f of['contact','phone','products','volume','next','next_date','notes'])$('v_'+f).value='';
+  $('v_at').value=localInput(new Date());$('v_result').value='interest';$('v_phone').value=p.phone||'';$('v_err').textContent='';
+  $('visitForm').hidden=false;$('pVisit').hidden=true;$('v_contact').focus();
+  vPos=geoDot?geoDot.getLatLng():null;
+  if(!vPos&&navigator.geolocation)navigator.geolocation.getCurrentPosition(ps=>{vPos={lat:ps.coords.latitude,lng:ps.coords.longitude};},()=>{},{maximumAge:120000,timeout:15000});};
+$('v_cancel').onclick=()=>{$('visitForm').hidden=true;$('pVisit').hidden=false;};
+$('v_save').onclick=async()=>{const p=places.find(x=>x.id===cur);if(!p)return;
+  const v=f=>$('v_'+f).value.trim()||null,res=$('v_result').value;
+  if(res==='refused'&&!v('notes')){$('v_err').textContent='Напишите в заметках причину отказа, её увидят все.';$('v_notes').focus();return;}
+  const row={place_id:p.id,author:me.id,visited_at:new Date($('v_at').value||Date.now()).toISOString(),result:res,contact_name:v('contact'),contact_phone:v('phone'),
+    products:v('products'),volume:v('volume'),next_step:v('next'),next_date:v('next_date'),notes:v('notes'),lat:vPos?.lat??null,lon:vPos?.lng??null};
+  $('v_save').disabled=true;const r=p.id<0?'queued':await sendVisit(row);$('v_save').disabled=false;
+  if(r==='error')return;
+  if(r==='queued'){const q=vqGet();q.push(row);vqSet(q);updQueue();}else visited.add(p.id);
+  refreshMarker(p);
+  $('visitForm').hidden=true;$('pVisit').hidden=false;if(cur===p.id){openPlace(p.id);}};
+// 'ok' | 'queued' (нет связи) | 'error'
+async function sendVisit(row){
+  let error=null;try{({error}=await sb.from('visits').insert(row));}catch(e){error={message:String(e)};}
+  if(error){
+    if(!navigator.onLine||/fetch|network|timeout|Load failed/i.test(error.message))return'queued';
+    $('v_err').textContent=/visits/.test(error.message)&&/exist|schema/i.test(error.message)?'Визиты ещё не включены: администратору нужно один раз выполнить SQL-скрипт update_visits.sql в Supabase.':'Не сохранилось: '+error.message;return'error';}
+  await applyVisit(row);return'ok';
+}
+// после визита обновляем статус точки и ставим менеджера ответственным, если его не было
+async function applyVisit(row){const p=places.find(x=>x.id===row.place_id);if(!p)return;
+  let ns=RES_STATUS[row.result];if(p.status==='client'&&ns&&ns!=='refused')ns=null;
+  const patch={};if(ns&&ns!==p.status)patch.status=ns;if(!p.owner)patch.owner=row.author;
+  if(Object.keys(patch).length){const{data}=await sb.from('places').update(patch).eq('id',p.id).select().single();if(data){Object.assign(p,data);refreshMarker(p);}}
+  if(row.result==='refused')await sb.from('place_comments').insert({place_id:p.id,author:row.author,body:'Отказ: '+(row.notes||'')});
+}
+async function flushVisits(){if(!me)return;const q=vqGet();if(!q.length){updQueue();return;}const left=[];
+  for(const row of q){if(row.author!==me.id||row.place_id<0){left.push(row);continue;}const r=await sendVisit(row);if(r!=='ok')left.push(row);else visited.add(row.place_id);}
+  vqSet(left);updQueue();if(cur)loadVisits(cur);}
+function updQueue(){vqIds=new Set(vqGet().map(r=>r.place_id));const n=vqGet().filter(r=>r.author===me?.id).length,m=oqMine().length;$('vQueue').hidden=!(n||m);
+  $('vQueue').textContent=`Ждут отправки: ${[m?'правок '+m:'',n?'визитов '+n:''].filter(Boolean).join(', ')}. Уйдут сами, когда появится интернет.`;}
+async function flushAll(){await flushOutbox();await flushVisits();}
+addEventListener('online',async()=>{await flushAll();if(me&&offline)loadAll();}); // сначала отправляем своё, потом берём свежееsetInterval(()=>{if(navigator.onLine)flushAll();},60000);
+
+// ---- правки без интернета: изменения точек, комментарии и новые точки ждут в телефоне и уходят по порядку ----
+const OQ='ks_outbox',SAVED_LOCAL='Сохранено в телефоне, отправится, когда появится интернет.';
+function oqGet(){try{return JSON.parse(localStorage.getItem(OQ)||'[]');}catch{return[];}}
+function oqSet(a){try{localStorage.setItem(OQ,JSON.stringify(a));}catch{}}
+const oqMine=()=>oqGet().filter(o=>o.author===me?.id);
+function oqPush(op){const q=oqGet();q.push({...op,k:Math.random().toString(36).slice(2),author:me.id,at:new Date().toISOString()});oqSet(q);updQueue();}
+const oqHas=id=>oqMine().some(o=>o.id===id||o.tmp===id);
+// с сетью сохраняем сразу; без сети, или если по этой точке уже есть неотправленное, ставим в очередь
+async function savePlace(id,patch){
+  if(id>0&&navigator.onLine&&!oqHas(id)){
+    const r=await tmo(sb.from('places').update(patch).eq('id',id).select().single(),15000);
+    if(r!=='timeout'&&!(r.error&&isNet(r.error)))return r;}
+  oqPush({t:'upd',id,patch});if(navigator.onLine)setTimeout(flushAll,3000);
+  return{data:{...patch,updated_at:new Date().toISOString()},queued:true};}
+async function addCmt(id,body){
+  if(id>0&&navigator.onLine&&!oqHas(id)){
+    const{error}=await sb.from('place_comments').insert({place_id:id,author:me.id,body});
+    if(!error||!isNet(error))return{error};}
+  oqPush({t:'cmt',id,body});return{queued:true};}
+// после загрузки с сервера заново накладываем свои неотправленные правки, чтобы они не пропали с экрана
+function applyPending(){for(const o of oqMine()){
+  if(o.t==='ins'&&!places.some(x=>x.id===o.tmp))places.unshift({...o.place});
+  if(o.t==='upd'){const p=places.find(x=>x.id===o.id);if(p)Object.assign(p,o.patch);}}}
+let flushing=false;
+async function flushOutbox(){if(flushing||!me||!navigator.onLine)return;flushing=true;const fails=[];
+  try{for(;;){const op=oqMine()[0];if(!op)break;let res;
+    if(op.t==='ins')res=await sb.from('places').insert(op.row).select().single();
+    else if(op.t==='upd')res=await sb.from('places').update(op.patch).eq('id',op.id).select().single();
+    else res=await sb.from('place_comments').insert({place_id:op.id,author:op.author,body:op.body,created_at:op.at});
+    if(res.error&&isNet(res.error))break;
+    let q=oqGet().filter(o=>o.k!==op.k);
+    if(res.error){const p=places.find(x=>x.id===(op.id??op.tmp));fails.push(`«${p?.name||'точка'}»: ${res.error.message}`);}
+    else if(op.t==='ins'){const id=res.data.id,p=places.find(x=>x.id===op.tmp);
+      q=q.map(o=>o.id===op.tmp?{...o,id}:o);vqSet(vqGet().map(r=>r.place_id===op.tmp?{...r,place_id:id}:r));
+      markers.get(op.tmp)?.remove();markers.delete(op.tmp);if(cur===op.tmp)cur=id;
+      if(p){Object.assign(p,res.data);refreshMarker(p);}}
+    else if(op.t==='upd'){const p=places.find(x=>x.id===op.id);if(p&&res.data){Object.assign(p,res.data);applyPending();refreshMarker(p);}}
+    oqSet(q);}}
+  finally{flushing=false;updQueue();}
+  if(fails.length)alert('Не удалось отправить '+fails.length+' правк(и):\n'+fails.join('\n'));
+  if(cur)loadComments(cur);}
+async function loadVisits(id){const box=$('visits');box.innerHTML='';
+  const q=vqGet().filter(r=>r.place_id===id).map(r=>({...r,queued:true}));
+  const{data,error}=await sb.from('visits').select('*').eq('place_id',id).order('visited_at',{ascending:false});
+  const all=q.concat(error?[]:data);
+  // флажок на карте следует за визитами: удалили последний — точка снова кружок
+  const pl=places.find(x=>x.id===id);
+  if(pl&&!error){const was=isVisited(pl);data.length?visited.add(id):visited.delete(id);if(isVisited(pl)!==was){refreshMarker(pl);}}
+  if(!all.length){box.innerHTML=`<span class="k">${error&&!q.length?(isNet(error)?'Визиты появятся, когда будет интернет.':'Визиты ещё не включены (нужен скрипт update_visits.sql).'):'Визитов пока не было.'}</span>`;return;}
+  all.forEach(v=>{const d=document.createElement('div');d.className='vitem'+(v.queued?' queued':'');const a=profiles.find(x=>x.id===v.author);
+    d.innerHTML='<div class="k"></div><div><b></b></div><div></div>';
+    d.children[0].textContent=(a?.full_name||'—')+' · '+new Date(v.visited_at).toLocaleString('ru-RU')+(v.queued?' · ждёт отправки':'');
+    d.children[1].firstChild.textContent=RESULTS[v.result]||v.result;
+    d.children[2].textContent=[v.contact_name&&('Контакт: '+v.contact_name+(v.contact_phone?', '+v.contact_phone:'')),v.products&&('Интересует: '+v.products),v.volume&&('Объём: '+v.volume),
+      v.next_step&&('Дальше: '+v.next_step+(v.next_date?' до '+new Date(v.next_date).toLocaleDateString('ru-RU'):'')),v.notes].filter(Boolean).join('\n');
+    d.children[2].style.whiteSpace='pre-line';
+    // удалить визит может его автор или админ; статус точки при этом не откатывается
+    if(v.author===me.id||profiles.find(x=>x.id===me.id)?.role==='admin'){const b=document.createElement('button');b.type='button';b.className='del danger';b.textContent='Удалить';
+      b.onclick=async()=>{if(b.dataset.confirm!=='1'){b.dataset.confirm='1';b.textContent='Точно удалить?';return;}
+        if(v.queued){vqSet(vqGet().filter(r=>!(r.place_id===v.place_id&&r.visited_at===v.visited_at&&r.author===v.author)));updQueue();}
+        else{const{error}=await sb.from('visits').delete().eq('id',v.id);if(error){b.textContent='Не удалилось';return;}}
+        loadVisits(id);};
+      d.prepend(b);}
+    box.appendChild(d);});
+}
+
+// ---- отчёт: визиты и комментарии за период, выгрузка в Excel для переноса в CRM ----
+let rRows=[],rComments=[],rVisits=[];
+$('reportBtn').onclick=()=>{const u=$('rUser');u.innerHTML='';u.add(new Option('Все менеджеры',''));profiles.forEach(p=>u.add(new Option(p.full_name||p.id,p.id)));
+  if(!$('rFrom').value){const t=new Date();$('rTo').value=dstr(t);t.setDate(t.getDate()-13);$('rFrom').value=dstr(t);}
+  $('report').hidden=false;showReport();};
+$('rClose').onclick=()=>{$('report').hidden=true;};
+$('rShow').onclick=showReport;
+const pname=id=>profiles.find(x=>x.id===id)?.full_name||'—';
+async function showReport(){
+  const from=new Date($('rFrom').value+'T00:00'),to=new Date($('rTo').value+'T00:00');to.setDate(to.getDate()+1);const u=$('rUser').value;
+  $('rSum').textContent='Загружаю…';$('rTable').innerHTML='';
+  let qv=sb.from('visits').select('*').gte('visited_at',from.toISOString()).lt('visited_at',to.toISOString()).order('visited_at');
+  let qc=sb.from('place_comments').select('*').gte('created_at',from.toISOString()).lt('created_at',to.toISOString()).order('created_at');
+  if(u){qv=qv.eq('author',u);qc=qc.eq('author',u);}
+  const[{data:vs,error:e1},{data:cs}]=await Promise.all([qv,qc]);
+  if(e1){$('rSum').textContent=/visits/.test(e1.message)?'Визиты ещё не включены: администратору нужно один раз выполнить SQL-скрипт update_visits.sql в Supabase.':'Ошибка: '+e1.message;return;}
+  const P=id=>places.find(x=>x.id===id)||{};rVisits=vs;
+  rRows=vs.map(v=>{const p=P(v.place_id);return{'Дата визита':new Date(v.visited_at).toLocaleString('ru-RU'),'Менеджер':pname(v.author),'Компания':p.name||'',
+    'Тип':(TYPES[p.type]||[p.type||''])[0],'Область':p.region||'','Адрес':p.address||'','УНП':p.unp||'','Телефон компании':p.phone||'','Email':p.email||'','Сайт':p.website||'',
+    'Контактное лицо':v.contact_name||'','Телефон контакта':v.contact_phone||'','Результат':RESULTS[v.result]||v.result,'Статус точки сейчас':STATUSES[p.status]||p.status||'',
+    'Что интересует':v.products||'','Объём':v.volume||'','Следующий шаг':v.next_step||'','Срок следующего шага':v.next_date?new Date(v.next_date).toLocaleDateString('ru-RU'):'',
+    'Заметки':v.notes||'','Координаты точки':p.lat!=null?`${(+p.lat).toFixed(6)}, ${(+p.lon).toFixed(6)}`:'','id точки':v.place_id,_id:v.place_id};});
+  rComments=(cs||[]).map(c=>{const p=P(c.place_id);return{'Дата':new Date(c.created_at).toLocaleString('ru-RU'),'Менеджер':pname(c.author),'Компания':p.name||'','Область':p.region||'','Комментарий':c.body,'id точки':c.place_id};});
+  const byRes={};vs.forEach(v=>{const k=RESULTS[v.result]||v.result;byRes[k]=(byRes[k]||0)+1;});
+  $('rSum').textContent=`Визитов: ${vs.length}`+(vs.length?' ('+Object.entries(byRes).map(([k,n])=>k.toLowerCase()+': '+n).join(', ')+')':'')+`. Комментариев за период: ${rComments.length}.`+(vs.length?' Нажмите на компанию, чтобы открыть её на карте.':'');
+  const cols=['Дата визита','Менеджер','Компания','Область','Контактное лицо','Телефон контакта','Результат','Что интересует','Объём','Следующий шаг','Срок следующего шага','Заметки'];
+  const t=$('rTable');const hr=t.insertRow();cols.forEach(c=>{const th=document.createElement('th');th.textContent=c;hr.appendChild(th);});
+  rRows.forEach(r=>{const tr=t.insertRow();cols.forEach(c=>{const td=tr.insertCell();td.textContent=r[c];if(c==='Компания'){td.className='c';td.onclick=()=>{$('report').hidden=true;openPlace(r._id,true);};}});});
+}
+async function loadXLSX(){if(window.XLSX)return;await new Promise((ok,bad)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=ok;s.onerror=bad;document.head.appendChild(s);});}
+$('rXlsx').onclick=async()=>{if(!rRows.length&&!rComments.length){$('rSum').textContent='За выбранный период нечего выгружать.';return;}
+  try{await loadXLSX();}catch{$('rSum').textContent='Не загрузился модуль Excel, проверьте интернет.';return;}
+  const wb=XLSX.utils.book_new(),clean=rRows.map(({_id,...r})=>r);
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(clean.length?clean:[{'Визитов нет':''}]),'Визиты');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rComments.length?rComments:[{'Комментариев нет':''}]),'Комментарии');
+  const u=$('rUser').value?' '+pname($('rUser').value):'';XLSX.writeFile(wb,`Визиты${u} ${$('rFrom').value} — ${$('rTo').value}.xlsx`);};
+
+// Битрикс24 принимает в CRM только CSV; на шаге сопоставления полей колонки можно переназначить.
+// Одна строка на компанию: все визиты за период собраны в комментарий лида.
+$('rBitrix').onclick=()=>{if(!rVisits.length){$('rSum').textContent='За выбранный период визитов нет, выгружать нечего.';return;}
+  const by=new Map();rVisits.forEach(v=>{by.has(v.place_id)?by.get(v.place_id).push(v):by.set(v.place_id,[v]);});
+  const rows=[...by].map(([id,vs])=>{const p=places.find(x=>x.id===id)||{},last=vs[vs.length-1],c=[...vs].reverse().find(v=>v.contact_name||v.contact_phone)||{};
+    const com=vs.map(v=>[new Date(v.visited_at).toLocaleDateString('ru-RU')+', '+pname(v.author)+': '+(RESULTS[v.result]||v.result),
+      v.contact_name&&('Контакт: '+v.contact_name+(v.contact_phone?', '+v.contact_phone:'')),v.products&&('Интересует: '+v.products),v.volume&&('Объём: '+v.volume),
+      v.next_step&&('Следующий шаг: '+v.next_step+(v.next_date?' до '+new Date(v.next_date).toLocaleDateString('ru-RU'):'')),v.notes].filter(Boolean).join('. ')).join('\n');
+    const extra=[p.unp&&('УНП: '+p.unp),c.contact_phone&&p.phone&&c.contact_phone!==p.phone&&('Телефон компании: '+p.phone),p.lat!=null&&(`Координаты: ${(+p.lat).toFixed(6)}, ${(+p.lon).toFixed(6)}`),'Карта: точка №'+id].filter(Boolean).join('\n');
+    return{'Название лида':`${p.name||'Компания'}: ${RESULTS[last.result]||last.result}`,'Название компании':p.name||'','Имя':c.contact_name||'','Рабочий телефон':c.contact_phone||p.phone||'',
+      'Рабочий e-mail':p.email||'','Корпоративный сайт':p.website||'','Адрес':[p.address,p.region].filter(Boolean).join(', '),'Ответственный':pname(last.author),'Комментарий':com+'\n'+extra};});
+  const cols=Object.keys(rows[0]),q=x=>'"'+String(x??'').replace(/"/g,'""')+'"';
+  const csv='﻿'+[cols.map(q).join(',')].concat(rows.map(r=>cols.map(c=>q(r[c])).join(','))).join('\r\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download=`Битрикс24 лиды ${$('rFrom').value} — ${$('rTo').value}.csv`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+  $('rSum').textContent=`Выгружено лидов: ${rows.length} (по одному на компанию, все визиты в комментарии).`;};
+
+boot();
+</script>
+</body>
+</html>
