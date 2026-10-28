@@ -253,8 +253,8 @@ const flagSvg=(c,h=26)=>`<svg width="${Math.round(h*.77)}" height="${h}" viewBox
 let visited=new Set(),vqIds=new Set();
 const isVisited=p=>visited.has(p.id)||vqIds.has(p.id);
 // размер флажка растёт с масштабом, чтобы на общем виде он был не больше соседних кружков
-const flagH=()=>{const z=map?map.getZoom():12;return z<=7?16:z<=8?18:z<=10?22:z<=12?26:30;};
-function flagIcon(p,on){const h=flagH()+(on?10:0),w=Math.round(h*.77);
+const flagH=()=>{const z=map?map.getZoom():12;return z<=7?12:z<=8?13:z<=10?15:z<=12?17:z<=14?19:21;};
+function flagIcon(p,on){const h=flagH()+(on?6:0),w=Math.round(h*.77);
   return L.divIcon({className:'flagicon'+(p.hidden&&!on?' hid':''),html:flagSvg(FLAG[p.status]||'#adb5bd',h),iconSize:[w,h],iconAnchor:[Math.round(h*.135),h-1],tooltipAnchor:[w/2,-h/2]});}
 // меню статусов с флажками: настоящий <select> остаётся (значение и события), поверх него кнопка и список
 function flagSelect(sel){
