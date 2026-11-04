@@ -72,7 +72,7 @@ aside{background:var(--panel);border-right:1px solid var(--line);display:flex;fl
 .rlabel::before{display:none}
 /* флажки визитов и меню статусов с флажками */
 .flagicon{background:none;border:0}
-.flagicon svg{display:block;filter:drop-shadow(0 1px 1.5px rgb(0 0 0/.45))}
+.flagicon svg{display:block;overflow:visible;filter:drop-shadow(0 1px 2px rgb(0 0 0/.6))}
 .flagicon.hid{opacity:.6}
 .fsel{position:relative;flex:1 1 0;min-width:0}
 .row>select{flex:1 1 0;min-width:0}
@@ -102,6 +102,12 @@ a.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .rctl{display:flex;flex-wrap:wrap;gap:8px;align-items:end;padding:12px 16px}
 .rctl label{display:grid;gap:3px;font-size:12px;color:var(--muted)}
 .rctl input,.rctl select{width:auto}
+.msel{position:relative;display:grid;gap:3px;font-size:12px;color:var(--muted)}
+.msel-btn{min-width:170px;text-align:left;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 9px;color:var(--fg);cursor:pointer}
+.msel-list{position:absolute;top:100%;left:0;z-index:5;margin-top:4px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px;box-shadow:0 4px 16px rgb(0 0 0/.2);display:grid;gap:2px;min-width:200px}
+.msel-list label{display:flex;gap:8px;align-items:center;padding:4px 6px;color:var(--fg);font-size:14px;cursor:pointer;border-radius:4px}
+.msel-list label:hover{background:var(--sel)}
+.msel-list input{width:auto;margin:0}
 #rSum{padding:0 16px 8px}
 .rtable{overflow:auto;padding:0 16px 16px;flex:1;min-height:0}
 .rtable table{border-collapse:collapse;font-size:13px;min-width:100%}
@@ -216,6 +222,7 @@ a.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
     <div class="ph"><h2 style="font-size:18px">Отчёт по визитам</h2><button id="rClose" type="button" aria-label="Закрыть">✕</button></div>
     <div class="rctl">
       <label>Менеджер<select id="rUser"></select></label>
+      <div class="msel" id="rStatus"><span>Статус клиента</span><button type="button" class="msel-btn">Все статусы</button><div class="msel-list" hidden></div></div>
       <label>С<input type="date" id="rFrom"></label>
       <label>По<input type="date" id="rTo"></label>
       <button class="primary" id="rShow" type="button">Показать</button>
@@ -249,11 +256,11 @@ REGIONS.forEach(r=>{$('fRegion').add(new Option(r,r));});$('e_region').add(new O
 
 // ---- флажки: точка, где был визит, рисуется флажком цвета своего статуса; отказ — чёрный ----
 const FLAG={new:'#ffffff',to_check:'#fab005',contacted:'#1c7ed6',negotiation:'#f76707',client:'#2b8a3e',refused:'#000000',closed:'#868e96'};
-const flagSvg=(c,h=26)=>`<svg width="${Math.round(h*.77)}" height="${h}" viewBox="0 0 20 26" aria-hidden="true"><path d="M3.5 25V2" stroke="#fff" stroke-width="4" stroke-linecap="round"/><path d="M3.5 25V2" stroke="#222" stroke-width="2" stroke-linecap="round"/><path d="M4.5 2.5h13l-3.4 4.6 3.4 4.6h-13z" fill="${c}" stroke="${c==='#ffffff'?'#495057':'#fff'}" stroke-width="1.3" stroke-linejoin="round"/></svg>`;
+const flagSvg=(c,h=26)=>`<svg width="${Math.round(h*.77)}" height="${h}" viewBox="0 0 20 26" aria-hidden="true"><path d="M3.5 25V2" stroke="#fff" stroke-width="4" stroke-linecap="round"/><path d="M3.5 25V2" stroke="#222" stroke-width="2" stroke-linecap="round"/><path d="M4.5 2h14.5l-3.8 6.5 3.8 6.5h-14.5z" fill="none" stroke="#fff" stroke-width="3.2" stroke-linejoin="round"/><path d="M4.5 2h14.5l-3.8 6.5 3.8 6.5h-14.5z" fill="${c}" stroke="#1d2a22" stroke-width="1.2" stroke-linejoin="round"/></svg>`;
 let visited=new Set(),vqIds=new Set();
 const isVisited=p=>visited.has(p.id)||vqIds.has(p.id);
 // размер флажка растёт с масштабом, чтобы на общем виде он был не больше соседних кружков
-const flagH=()=>{const z=map?map.getZoom():12;return z<=7?12:z<=8?13:z<=10?15:z<=12?17:z<=14?19:21;};
+const flagH=()=>{const z=map?map.getZoom():12;return z<=7?15:z<=8?16:z<=10?19:z<=12?22:z<=14?24:26;};
 function flagIcon(p,on){const h=flagH()+(on?6:0),w=Math.round(h*.77);
   return L.divIcon({className:'flagicon'+(p.hidden&&!on?' hid':''),html:flagSvg(FLAG[p.status]||'#adb5bd',h),iconSize:[w,h],iconAnchor:[Math.round(h*.135),h-1],tooltipAnchor:[w/2,-h/2]});}
 // меню статусов с флажками: настоящий <select> остаётся (значение и события), поверх него кнопка и список
@@ -704,6 +711,14 @@ $('reportBtn').onclick=()=>{const u=$('rUser');u.innerHTML='';u.add(new Option('
   if(!$('rFrom').value){const t=new Date();$('rTo').value=dstr(t);t.setDate(t.getDate()-13);$('rFrom').value=dstr(t);}
   $('report').hidden=false;showReport();};
 $('rClose').onclick=()=>{$('report').hidden=true;};
+// статус клиента в отчёте: можно отметить несколько; ничего не отмечено — все статусы
+{const box=$('rStatus'),btn=box.querySelector('.msel-btn'),list=box.querySelector('.msel-list');
+  Object.entries(STATUSES).forEach(([k,v])=>{const l=document.createElement('label');l.innerHTML='<input type="checkbox">'+(FLAG[k]?flagSvg(FLAG[k],16):'')+'<span></span>';l.querySelector('input').value=k;l.querySelector('span').textContent=v;list.appendChild(l);});
+  const upd=()=>{const on=rStatuses();btn.textContent=!on.length?'Все статусы':on.length===1?STATUSES[on[0]]:'Выбрано: '+on.length;};
+  list.onchange=()=>{upd();showReport();};
+  btn.onclick=e=>{e.stopPropagation();list.hidden=!list.hidden;};
+  document.addEventListener('click',e=>{if(!box.contains(e.target))list.hidden=true;});}
+function rStatuses(){return[...$('rStatus').querySelectorAll('input:checked')].map(i=>i.value);}
 $('rShow').onclick=showReport;
 const pname=id=>profiles.find(x=>x.id===id)?.full_name||'—';
 async function showReport(){
@@ -712,9 +727,11 @@ async function showReport(){
   let qv=sb.from('visits').select('*').gte('visited_at',from.toISOString()).lt('visited_at',to.toISOString()).order('visited_at');
   let qc=sb.from('place_comments').select('*').gte('created_at',from.toISOString()).lt('created_at',to.toISOString()).order('created_at');
   if(u){qv=qv.eq('author',u);qc=qc.eq('author',u);}
-  const[{data:vs,error:e1},{data:cs}]=await Promise.all([qv,qc]);
+  let[{data:vs,error:e1},{data:cs}]=await Promise.all([qv,qc]);
   if(e1){$('rSum').textContent=/visits/.test(e1.message)?'Визиты ещё не включены: администратору нужно один раз выполнить SQL-скрипт update_visits.sql в Supabase.':'Ошибка: '+e1.message;return;}
-  const P=id=>places.find(x=>x.id===id)||{};rVisits=vs;
+  const P=id=>places.find(x=>x.id===id)||{};
+  const st=rStatuses();if(st.length){const ok=id=>st.includes(P(id).status);vs=vs.filter(v=>ok(v.place_id));if(cs)cs=cs.filter(c=>ok(c.place_id));}
+  rVisits=vs;
   rRows=vs.map(v=>{const p=P(v.place_id);return{'Дата визита':new Date(v.visited_at).toLocaleString('ru-RU'),'Менеджер':pname(v.author),'Компания':p.name||'',
     'Тип':(TYPES[p.type]||[p.type||''])[0],'Область':p.region||'','Адрес':p.address||'','УНП':p.unp||'','Телефон компании':p.phone||'','Email':p.email||'','Сайт':p.website||'',
     'Контактное лицо':v.contact_name||'','Телефон контакта':v.contact_phone||'','Результат':RESULTS[v.result]||v.result,'Статус точки сейчас':STATUSES[p.status]||p.status||'',
